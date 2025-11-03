@@ -1,0 +1,288 @@
+org: f4mmeri
+service: api-pedidos
+
+provider:
+  name: aws
+  runtime: python3.13  # Versión de Python que usarás
+  timeout: 20  # Tiempo de espera por defecto para las funciones
+  iam:
+    role: arn:aws:iam::895179168118:role/LabRole  # Rol IAM con permisos necesarios para Lambda y DynamoDB
+
+resources:
+  Resources:
+    ProductoTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ChinaWok-Productos
+        AttributeDefinitions:
+          - AttributeName: local_id
+            AttributeType: S
+          - AttributeName: nombre
+            AttributeType: S
+        KeySchema:
+          - AttributeName: local_id
+            KeyType: HASH  # Partition key
+          - AttributeName: nombre
+            KeyType: RANGE  # Sort key
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+    PedidoTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ChinaWok-Pedidos
+        AttributeDefinitions:
+          - AttributeName: local_id
+            AttributeType: S
+          - AttributeName: pedido_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: local_id
+            KeyType: HASH  # Partition key
+          - AttributeName: pedido_id
+            KeyType: RANGE  # Sort key
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+    OfertaTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ChinaWok-Ofertas
+        AttributeDefinitions:
+          - AttributeName: local_id
+            AttributeType: S
+          - AttributeName: oferta_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: local_id
+            KeyType: HASH  # Partition key
+          - AttributeName: oferta_id
+            KeyType: RANGE  # Sort key
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+    ComboTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ChinaWok-Combos
+        AttributeDefinitions:
+          - AttributeName: local_id
+            AttributeType: S
+          - AttributeName: combo_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: local_id
+            KeyType: HASH  # Partition key
+          - AttributeName: combo_id
+            KeyType: RANGE  # Sort key
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+functions:
+  # Producto CRUD Functions
+  crear_producto:
+    handler: src.productos.crear_producto.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /productos/crear
+          method: post
+          cors: true
+          integration: lambda
+
+  obtener_producto:
+    handler: src.productos.obtener_producto.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /productos/{local_id}/{nombre}
+          method: get
+          cors: true
+          integration: lambda
+
+  actualizar_producto:
+    handler: src.productos.actualizar_producto.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /productos/{local_id}/{nombre}
+          method: put
+          cors: true
+          integration: lambda
+
+  eliminar_producto:
+    handler: src.productos.eliminar_producto.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /productos/{local_id}/{nombre}
+          method: delete
+          cors: true
+          integration: lambda
+
+  listar_productos:
+    handler: src.productos.listar_productos.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /productos/listar
+          method: get
+          cors: true
+          integration: lambda
+
+  # Pedidos CRUD Functions
+  crear_pedido:
+    handler: src.pedidos.crear_pedido.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /pedidos/crear
+          method: post
+          cors: true
+          integration: lambda
+
+  obtener_pedido:
+    handler: src.pedidos.obtener_pedido.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /pedidos/{local_id}/{pedido_id}
+          method: get
+          cors: true
+          integration: lambda
+
+  actualizar_pedido:
+    handler: src.pedidos.actualizar_pedido.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /pedidos/{local_id}/{pedido_id}
+          method: put
+          cors: true
+          integration: lambda
+
+  eliminar_pedido:
+    handler: src.pedidos.eliminar_pedido.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /pedidos/{local_id}/{pedido_id}
+          method: delete
+          cors: true
+          integration: lambda
+
+  listar_pedidos:
+    handler: src.pedidos.listar_pedidos.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /pedidos/listar
+          method: get
+          cors: true
+          integration: lambda
+
+  # Ofertas CRUD Functions
+  crear_oferta:
+    handler: src.ofertas.crear_oferta.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /ofertas/crear
+          method: post
+          cors: true
+          integration: lambda
+
+  obtener_oferta:
+    handler: src.ofertas.obtener_oferta.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /ofertas/{local_id}/{oferta_id}
+          method: get
+          cors: true
+          integration: lambda
+
+  actualizar_oferta:
+    handler: src.ofertas.actualizar_oferta.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /ofertas/{local_id}/{oferta_id}
+          method: put
+          cors: true
+          integration: lambda
+
+  eliminar_oferta:
+    handler: src.ofertas.eliminar_oferta.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /ofertas/{local_id}/{oferta_id}
+          method: delete
+          cors: true
+          integration: lambda
+
+  listar_ofertas:
+    handler: src.ofertas.listar_ofertas.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /ofertas/listar
+          method: get
+          cors: true
+          integration: lambda
+
+  # Combos CRUD Functions
+  crear_combo:
+    handler: src.combos.crear_combo.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /combos/crear
+          method: post
+          cors: true
+          integration: lambda
+
+  obtener_combo:
+    handler: src.combos.obtener_combo.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /combos/{local_id}/{combo_id}
+          method: get
+          cors: true
+          integration: lambda
+
+  actualizar_combo:
+    handler: src.combos.actualizar_combo.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /combos/{local_id}/{combo_id}
+          method: put
+          cors: true
+          integration: lambda
+
+  eliminar_combo:
+    handler: src.combos.eliminar_combo.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /combos/{local_id}/{combo_id}
+          method: delete
+          cors: true
+          integration: lambda
+
+  listar_combos:
+    handler: src.combos.listar_combos.lambda_handler
+    memorySize: 512
+    events:
+      - http:
+          path: /combos/listar
+          method: get
+          cors: true
+          integration: lambda
