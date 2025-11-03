@@ -1,5 +1,5 @@
 org: f4mmeri
-service: api-pedidos
+service: chinawok-api-pedidos
 
 provider:
   name: aws
