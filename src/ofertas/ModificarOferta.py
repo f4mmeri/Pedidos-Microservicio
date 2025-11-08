@@ -1,66 +1,92 @@
-import boto3
 import json
+import boto3
 from datetime import datetime
 
-TABLE_NAME = 'ChinaWok-Productos'
+dynamodb = boto3.resource("dynamodb")
+# Si usas variable de entorno, cambia por os.environ["OFFERS_TABLE"]
+TABLE_NAME = "ChinaWok-Ofertas"
+table = dynamodb.Table(TABLE_NAME)
+
+def _resp(status, body):
+    return {
+        "statusCode": status,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        },
+        "body": json.dumps(body, ensure_ascii=False)
+    }
 
 def lambda_handler(event, context):
-    # Obtener parámetros de la URL
-    params = event.get('pathParameters') or {}
-    local_id = params.get('local_id')
-    nombre = params.get('nombre')
+    # path params
+    params = event.get("pathParameters") or {}
+    local_id = params.get("local_id")
+    oferta_id = params.get("oferta_id")
 
-    if not local_id or not nombre:
-        return {"message": "Faltan parámetros local_id/nombre", "code": 400}
+    if not local_id or not oferta_id:
+        return _resp(400, {"message": "Faltan parámetros local_id/oferta_id"})
 
-    # Leer el body del evento (información de la oferta)
+    # body
     try:
-        body = json.loads(event['body'])
+        body_raw = event.get("body")
+        body = json.loads(body_raw or "{}") if isinstance(body_raw, str) else (body_raw or {})
     except Exception:
-        return {"message": "Body inválido; se esperaba JSON objeto", "code": 400}
+        return _resp(400, {"message": "Body inválido; se esperaba JSON"})
 
-    # Validaciones de la oferta
-    if "descuento" in body and (not isinstance(body["descuento"], (int, float)) or body["descuento"] <= 0):
-        return {"message": "Descuento inválido", "code": 400}
-    
-    if "inicio" in body or "fin" in body:
+    # Campos permitidos (todos opcionales en PUT parcial)
+    # ejemplo: descuento (float>0), inicio/fin (ISO 8601), activo (bool), nombre_producto, notas
+    allowed = {"descuento", "inicio", "fin", "activo", "nombre_producto", "notas"}
+    to_update = {k: v for k, v in body.items() if k in allowed}
+
+    if not to_update:
+        return _resp(400, {"message": "No hay campos válidos para actualizar"})
+
+    # Validaciones básicas
+    if "descuento" in to_update:
+        d = to_update["descuento"]
+        if not isinstance(d, (int, float)) or d <= 0:
+            return _resp(400, {"message": "descuento inválido"})
+
+    # fechas (si vienen). Acepta ...Z convirtiendo a +00:00
+    def _parse_iso(s):
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+
+    inicio = fin = None
+    if "inicio" in to_update:
         try:
-            if "inicio" in body:
-                inicio = datetime.fromisoformat(body["inicio"])
-            if "fin" in body:
-                fin = datetime.fromisoformat(body["fin"])
-        except ValueError:
-            return {"message": "Formato de fecha inválido", "code": 400}
+            inicio = _parse_iso(to_update["inicio"])
+        except Exception:
+            return _resp(400, {"message": "inicio con formato inválido (ISO 8601)"})
+    if "fin" in to_update:
+        try:
+            fin = _parse_iso(to_update["fin"])
+        except Exception:
+            return _resp(400, {"message": "fin con formato inválido (ISO 8601)"})
+    if inicio and fin and inicio >= fin:
+        return _resp(400, {"message": "inicio debe ser anterior a fin"})
 
-        if inicio >= fin:
-            return {"message": "La fecha de inicio debe ser anterior a la fecha de fin", "code": 400}
+    # Verifica existencia
+    existing = table.get_item(Key={"local_id": local_id, "oferta_id": oferta_id}).get("Item")
+    if not existing:
+        return _resp(404, {"message": "Oferta no encontrada"})
 
-    # Conectar con DynamoDB
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(TABLE_NAME)
+    # Build UpdateExpression dinámico
+    expr_names, expr_vals, sets = {}, {}, []
+    for k, v in to_update.items():
+        expr_names[f"#{k}"] = k
+        expr_vals[f":{k}"] = v
+        sets.append(f"#{k} = :{k}")
 
-    # Obtener el producto existente
-    response = table.get_item(Key={'local_id': local_id, 'nombre': nombre})
-    if 'Item' not in response:
-        return {"message": "Producto no encontrado", "code": 404}
+    update_expr = "SET " + ", ".join(sets)
 
-    # Actualizar la oferta
-    producto = response['Item']
-    oferta = producto.get('oferta', {})
-
-    # Actualizar solo los campos proporcionados
-    if "descuento" in body:
-        oferta["descuento"] = body["descuento"]
-    if "inicio" in body:
-        oferta["inicio"] = body["inicio"]
-    if "fin" in body:
-        oferta["fin"] = body["fin"]
-    if "activo" in body:
-        oferta["activo"] = body["activo"]
-
-    producto['oferta'] = oferta
-
-    # Guardar el producto con la oferta actualizada
-    table.put_item(Item=producto)
-
-    return {"message": "Oferta actualizada", "data": oferta}
+    try:
+        resp = table.update_item(
+            Key={"local_id": local_id, "oferta_id": oferta_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_vals,
+            ReturnValues="ALL_NEW"
+        )
+        return _resp(200, {"message": "Oferta actualizada", "data": resp.get("Attributes")})
+    except Exception as e:
+        return _resp(500, {"message": "Error al actualizar", "error": str(e)})
