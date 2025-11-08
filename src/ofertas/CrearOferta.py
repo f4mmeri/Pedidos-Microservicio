@@ -2,7 +2,7 @@ import boto3
 import json
 from datetime import datetime
 
-TABLE_NAME = 'ChinaWok-Productos'
+TABLE_NAME = 'ChinaWok-Ofertas'
 
 def lambda_handler(event, context):
     # Obtener parámetros de la URL
