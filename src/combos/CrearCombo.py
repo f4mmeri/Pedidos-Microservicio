@@ -6,7 +6,10 @@ TABLE_NAME = 'ChinaWok-Combos'
 def lambda_handler(event, context):
     # Leer body de la solicitud
     try:
-        combo = json.loads(event['body'])
+        if isinstance(event['body'], str):
+            combo = json.loads(event['body'])
+        else:
+            combo = event['body']
     except Exception:
         return {"message": "Body inválido; se esperaba JSON objeto", "code": 400}
 
