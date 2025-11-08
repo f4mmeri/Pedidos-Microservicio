@@ -128,7 +128,7 @@ functions:
     memorySize: 512
     events:
       - http:
-          path: /ofertas/{local_id}/id/{oferta_id}
+          path: /ofertas/{local_id}/{oferta_id}
           method: get
           cors: true
           integration: lambda
@@ -148,7 +148,7 @@ functions:
     memorySize: 512
     events:
       - http:
-          path: /ofertas/{local_id}/{nombre}
+          path: /ofertas/{local_id}/{oferta_id}
           method: delete
           cors: true
           integration: lambda
