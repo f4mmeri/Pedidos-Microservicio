@@ -87,7 +87,7 @@ functions:
     memorySize: 512
     events:
       - http:
-          path: /pedidos/{local_id}/{pedido_id}
+          path: /pedidos/{local_id}/id/{pedido_id}
           method: put
           cors: true
           integration: lambda
