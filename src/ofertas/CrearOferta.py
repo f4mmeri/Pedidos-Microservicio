@@ -1,62 +1,71 @@
 import boto3
 import json
 from datetime import datetime
+import uuid
 
 TABLE_NAME = 'ChinaWok-Ofertas'
 
 def lambda_handler(event, context):
-    # Obtener parámetros de la URL
-    params = event.get('pathParameters') or {}
-    local_id = params.get('local_id')
-    nombre = params.get('nombre')
-
-    if not local_id or not nombre:
-        return {"message": "Faltan parámetros local_id/nombre", "code": 400}
-
-    # Leer el body del evento (información de la oferta)
+    # Leer body del request
     try:
         body = json.loads(event['body'])
     except Exception:
-        return {"message": "Body inválido; se esperaba JSON objeto", "code": 400}
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "Body inválido; se esperaba JSON objeto"})
+        }
 
-    # Validaciones de la oferta
-    if "descuento" not in body or not isinstance(body["descuento"], (int, float)) or body["descuento"] <= 0:
-        return {"message": "Descuento inválido", "code": 400}
-    
-    if "inicio" not in body or "fin" not in body:
-        return {"message": "Faltan fechas de inicio/fin", "code": 400}
+    # Validar campos requeridos
+    required_fields = ["local_id", "producto_nombre", "fecha_inicio", "fecha_limite", "porcentaje_descuento"]
+    missing = [f for f in required_fields if f not in body]
+    if missing:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": f"Faltan campos: {', '.join(missing)}"})
+        }
 
+    # Validar fechas
     try:
-        inicio = datetime.fromisoformat(body["inicio"])
-        fin = datetime.fromisoformat(body["fin"])
+        inicio = datetime.fromisoformat(body["fecha_inicio"])
+        fin = datetime.fromisoformat(body["fecha_limite"])
+        if inicio >= fin:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "La fecha de inicio debe ser anterior a la fecha límite"})
+            }
     except ValueError:
-        return {"message": "Formato de fecha inválido", "code": 400}
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "Formato de fecha inválido"})
+        }
 
-    if inicio >= fin:
-        return {"message": "La fecha de inicio debe ser anterior a la fecha de fin", "code": 400}
+    # Validar descuento
+    descuento = body["porcentaje_descuento"]
+    if not isinstance(descuento, (int, float)) or descuento <= 0:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "Descuento inválido"})
+        }
 
-    # Definir el objeto oferta
+    # Crear objeto de oferta
     oferta = {
-        "descuento": body["descuento"],
-        "inicio": body["inicio"],
-        "fin": body["fin"],
-        "activo": body.get("activo", True)  # Por defecto, la oferta está activa
+        "oferta_id": body.get("oferta_id", str(uuid.uuid4())),
+        "local_id": body["local_id"],
+        "producto_nombre": body["producto_nombre"],
+        "fecha_inicio": body["fecha_inicio"],
+        "fecha_limite": body["fecha_limite"],
+        "porcentaje_descuento": descuento
     }
 
-    # Conectar con DynamoDB
+    # Guardar en DynamoDB
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(TABLE_NAME)
+    table.put_item(Item=oferta)
 
-    # Obtener el producto existente
-    response = table.get_item(Key={'local_id': local_id, 'nombre': nombre})
-    if 'Item' not in response:
-        return {"message": "Producto no encontrado", "code": 404}
-
-    # Actualizar la oferta en el producto
-    producto = response['Item']
-    producto['oferta'] = oferta
-
-    # Guardar el producto con la nueva oferta
-    table.put_item(Item=producto)
-
-    return {"message": "Oferta creada", "data": oferta}
+    return {
+        "statusCode": 201,
+        "body": json.dumps({
+            "message": "Oferta creada exitosamente",
+            "data": oferta
+        })
+    }

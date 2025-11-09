@@ -1,10 +1,9 @@
 import json
 import boto3
-
 from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource("dynamodb")
-TABLE_NAME = "ChinaWok-Productos"
+TABLE_NAME = "ChinaWok-Ofertas"
 table = dynamodb.Table(TABLE_NAME)
 
 def _resp(status, body):
@@ -20,18 +19,18 @@ def _resp(status, body):
 def lambda_handler(event, context):
     params = event.get("pathParameters") or {}
     local_id = params.get("local_id")
-    nombre = params.get("oferta_id")  # <-- si mantienes la ruta actual, 'oferta_id' sería en realidad el nombre del producto (confuso)
+    oferta_id = params.get("oferta_id")
 
-    if not local_id or not nombre:
-        return _resp(400, {"message": "Faltan parámetros local_id/nombre"})
+    if not local_id or not oferta_id:
+        return _resp(400, {"message": "Faltan parámetros local_id/oferta_id"})
 
-    resp = table.get_item(Key={"local_id": local_id, "nombre": nombre})
-    item = resp.get("Item")
-    if not item:
-        return _resp(404, {"message": "Producto no encontrado"})
+    try:
+        resp = table.get_item(Key={"local_id": local_id, "oferta_id": oferta_id})
+    except Exception as e:
+        return _resp(500, {"message": f"Error al acceder a DynamoDB: {str(e)}"})
 
-    oferta = item.get("oferta")
+    oferta = resp.get("Item")
     if not oferta:
-        return _resp(404, {"message": "Producto sin oferta"})
+        return _resp(404, {"message": "Oferta no encontrada"})
 
-    return _resp(200, {"message": "Oferta del producto", "data": {"local_id": local_id, "nombre": nombre, "oferta": oferta}})
+    return _resp(200, {"message": "Oferta encontrada", "data": oferta})
