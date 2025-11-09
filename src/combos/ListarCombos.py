@@ -4,7 +4,18 @@ from decimal import Decimal
 
 TABLE_NAME = 'ChinaWok-Combos'
 
-# --- Custom encoder para Decimal → float ---
+# --- Función para convertir Decimal a int o float según corresponda ---
+def fix_types(item):
+    for p in item.get("productos", []):
+        if isinstance(p.get("cantidad"), Decimal):
+            # si es entero, convertir a int; si tiene decimales, float
+            if p["cantidad"] % 1 == 0:
+                p["cantidad"] = int(p["cantidad"])
+            else:
+                p["cantidad"] = float(p["cantidad"])
+    return item
+
+# --- Custom encoder para otros Decimals (por seguridad) ---
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
@@ -16,11 +27,14 @@ def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
 
     try:
-        # --- Obtener todos los items ---
+        # --- Obtener todos los combos ---
         response = table.scan()
         items = response.get('Items', [])
 
-        # --- Respuesta JSON compacta ---
+        # --- Arreglar tipos de cantidad ---
+        items = [fix_types(c) for c in items]
+
+        # --- Retornar JSON compacto y limpio ---
         return {
             "statusCode": 200,
             "body": json.dumps({"data": items}, cls=DecimalEncoder, ensure_ascii=False),
@@ -33,7 +47,7 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"message": f"Error al listar items: {str(e)}"}, ensure_ascii=False),
+            "body": json.dumps({"message": f"Error al listar combos: {str(e)}"}, ensure_ascii=False),
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*"
