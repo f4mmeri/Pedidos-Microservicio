@@ -7,14 +7,22 @@ from decimal import Decimal
 TABLE_NAME = 'ChinaWok-Ofertas'
 
 def lambda_handler(event, context):
+    # ✅ Acepta tanto string JSON como objeto ya parseado
     try:
-        body = json.loads(event['body'])
+        body_raw = event.get('body', {})
+        if isinstance(body_raw, str):
+            body = json.loads(body_raw)
+        elif isinstance(body_raw, dict):
+            body = body_raw
+        else:
+            raise ValueError("Formato inesperado en body")
     except Exception:
         return {
             "statusCode": 400,
             "body": json.dumps({"message": "Body inválido; se esperaba JSON objeto"})
         }
 
+    # Campos requeridos
     required_fields = ["local_id", "producto_nombre", "fecha_inicio", "fecha_limite", "porcentaje_descuento"]
     missing = [f for f in required_fields if f not in body]
     if missing:
@@ -23,6 +31,7 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": f"Faltan campos: {', '.join(missing)}"})
         }
 
+    # Validar fechas
     try:
         inicio = datetime.fromisoformat(body["fecha_inicio"])
         fin = datetime.fromisoformat(body["fecha_limite"])
@@ -37,6 +46,7 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": "Formato de fecha inválido"})
         }
 
+    # Validar descuento
     descuento = body["porcentaje_descuento"]
     if not isinstance(descuento, (int, float)) or descuento <= 0:
         return {
@@ -44,8 +54,9 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": "Descuento inválido"})
         }
 
-    # ✅ Convertimos el descuento a Decimal antes de guardar
-    descuento_decimal = Decimal(str(descuento))
+    # Guardar en DynamoDB
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(TABLE_NAME)
 
     oferta = {
         "oferta_id": body.get("oferta_id", str(uuid.uuid4())),
@@ -53,12 +64,9 @@ def lambda_handler(event, context):
         "producto_nombre": body["producto_nombre"],
         "fecha_inicio": body["fecha_inicio"],
         "fecha_limite": body["fecha_limite"],
-        "porcentaje_descuento": descuento_decimal,
-        "activo": True  # opcional: para manejar estado
+        "porcentaje_descuento": Decimal(str(descuento)),
+        "activo": True
     }
-
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(TABLE_NAME)
 
     try:
         table.put_item(Item=oferta)
@@ -76,5 +84,5 @@ def lambda_handler(event, context):
         "body": json.dumps({
             "message": "Oferta creada exitosamente",
             "data": oferta
-        }, ensure_ascii=False, default=str)  # default=str para manejar Decimal
+        }, ensure_ascii=False, default=str)
     }
