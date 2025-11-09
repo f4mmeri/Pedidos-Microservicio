@@ -23,7 +23,7 @@ def _validar_producto(prod):
             return f"Falta {k}"
     if not isinstance(prod["nombre"], str) or not prod["nombre"]:
         return "nombre inválido"
-    if not isinstance(prod["precio"], (int, float)) or prod["precio"] < 0:
+    if not isinstance(prod["precio"], (int, float, Decimal)) or prod["precio"] < 0:
         return "precio inválido (>= 0)"
     if not isinstance(prod["stock"], int) or prod["stock"] < 0:
         return "stock inválido (entero >= 0)"
