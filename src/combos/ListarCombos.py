@@ -4,22 +4,12 @@ from decimal import Decimal
 
 TABLE_NAME = 'ChinaWok-Combos'
 
-# --- Función para convertir Decimal a int o float según corresponda ---
-def fix_types(item):
-    for p in item.get("productos", []):
-        if isinstance(p.get("cantidad"), Decimal):
-            # si es entero, convertir a int; si tiene decimales, float
-            if p["cantidad"] % 1 == 0:
-                p["cantidad"] = int(p["cantidad"])
-            else:
-                p["cantidad"] = float(p["cantidad"])
-    return item
-
-# --- Custom encoder para otros Decimals (por seguridad) ---
+# --- Custom encoder para Decimal → float ---
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
-            return float(obj)
+            # Convertimos a float con 2 decimales para que se vea más limpio
+            return float(round(obj, 2))
         return super().default(obj)
 
 def lambda_handler(event, context):
@@ -31,13 +21,22 @@ def lambda_handler(event, context):
         response = table.scan()
         items = response.get('Items', [])
 
-        # --- Arreglar tipos de cantidad ---
-        items = [fix_types(c) for c in items]
+        # --- Formatear la data para que solo contenga campos importantes ---
+        formatted = []
+        for combo in items:
+            formatted.append({
+                "local_id": combo.get("local_id"),
+                "combo_id": combo.get("combo_id"),
+                "nombre": combo.get("nombre"),
+                "productos_nombres": [p.get("nombre") for p in combo.get("productos", [])],
+                "precio": combo.get("precio"),
+                "disponible": combo.get("disponible", True)
+            })
 
-        # --- Retornar JSON compacto y limpio ---
+        # --- Retornar JSON “bonito” ---
         return {
             "statusCode": 200,
-            "body": json.dumps({"data": items}, cls=DecimalEncoder, ensure_ascii=False),
+            "body": json.dumps(formatted, ensure_ascii=False, cls=DecimalEncoder),
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*"
@@ -47,7 +46,10 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"message": f"Error al listar combos: {str(e)}"}, ensure_ascii=False),
+            "body": json.dumps(
+                {"message": f"Error al listar combos: {str(e)}"},
+                ensure_ascii=False
+            ),
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*"
