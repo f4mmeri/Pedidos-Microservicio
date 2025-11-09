@@ -1,22 +1,20 @@
 import boto3
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
+from decimal import Decimal
 
-TABLE_NAME = "ChinaWok-Ofertas"
+TABLE_NAME = 'ChinaWok-Ofertas'
 
 def lambda_handler(event, context):
-    # Leer body del request
     try:
-        body_raw = event.get("body")
-        body = json.loads(body_raw or "{}") if isinstance(body_raw, str) else (body_raw or {})
+        body = json.loads(event['body'])
     except Exception:
         return {
             "statusCode": 400,
             "body": json.dumps({"message": "Body inválido; se esperaba JSON objeto"})
         }
 
-    # Validar campos requeridos
     required_fields = ["local_id", "producto_nombre", "fecha_inicio", "fecha_limite", "porcentaje_descuento"]
     missing = [f for f in required_fields if f not in body]
     if missing:
@@ -25,10 +23,9 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": f"Faltan campos: {', '.join(missing)}"})
         }
 
-    # Validar fechas
     try:
-        inicio = datetime.fromisoformat(body["fecha_inicio"].replace("Z", "+00:00"))
-        fin = datetime.fromisoformat(body["fecha_limite"].replace("Z", "+00:00"))
+        inicio = datetime.fromisoformat(body["fecha_inicio"])
+        fin = datetime.fromisoformat(body["fecha_limite"])
         if inicio >= fin:
             return {
                 "statusCode": 400,
@@ -37,10 +34,9 @@ def lambda_handler(event, context):
     except ValueError:
         return {
             "statusCode": 400,
-            "body": json.dumps({"message": "Formato de fecha inválido (usa ISO 8601)"})
+            "body": json.dumps({"message": "Formato de fecha inválido"})
         }
 
-    # Validar descuento
     descuento = body["porcentaje_descuento"]
     if not isinstance(descuento, (int, float)) or descuento <= 0:
         return {
@@ -48,37 +44,37 @@ def lambda_handler(event, context):
             "body": json.dumps({"message": "Descuento inválido"})
         }
 
-    # Crear objeto de oferta
+    # ✅ Convertimos el descuento a Decimal antes de guardar
+    descuento_decimal = Decimal(str(descuento))
+
     oferta = {
         "oferta_id": body.get("oferta_id", str(uuid.uuid4())),
         "local_id": body["local_id"],
         "producto_nombre": body["producto_nombre"],
         "fecha_inicio": body["fecha_inicio"],
         "fecha_limite": body["fecha_limite"],
-        "porcentaje_descuento": float(descuento),
-        "activo": True,
-        "creado_en": datetime.now(timezone.utc).isoformat()
+        "porcentaje_descuento": descuento_decimal,
+        "activo": True  # opcional: para manejar estado
     }
 
-    # Guardar en DynamoDB
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(TABLE_NAME)
+
     try:
-        dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table(TABLE_NAME)
         table.put_item(Item=oferta)
     except Exception as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"message": "Error al guardar en DynamoDB", "error": str(e)})
+            "body": json.dumps({
+                "message": "Error al guardar en DynamoDB",
+                "error": str(e)
+            })
         }
 
     return {
         "statusCode": 201,
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
-        },
         "body": json.dumps({
             "message": "Oferta creada exitosamente",
             "data": oferta
-        })
+        }, ensure_ascii=False, default=str)  # default=str para manejar Decimal
     }
