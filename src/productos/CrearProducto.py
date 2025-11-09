@@ -1,6 +1,7 @@
 import boto3
 import json
 import uuid  # 👈 para generar el UUID
+from decimal import Decimal
 
 TABLE_NAME = 'ChinaWok-Productos'
 CATEGORIAS_VALIDAS = [
@@ -43,7 +44,7 @@ def lambda_handler(event, context):
     # --- Parsear body ---
     try:
         body_raw = event.get('body')
-        producto = json.loads(body_raw) if isinstance(body_raw, str) else (body_raw or {})
+        producto = json.loads(body_raw, parse_float=Decimal) if isinstance(body_raw, str) else (body_raw or {})
     except Exception:
         return _resp(400, {"message": "Body inválido; se esperaba JSON objeto"})
 
