@@ -2,6 +2,8 @@ import boto3
 import json
 from decimal import Decimal
 
+TABLE_NAME = 'ChinaWok-Combos'
+
 # --- Custom encoder para Decimal → float ---
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -10,10 +12,8 @@ class DecimalEncoder(json.JSONEncoder):
         return super().default(obj)
 
 def lambda_handler(event, context):
-    # --- Configura la tabla desde el evento o hardcode ---
-    table_name = event.get('table_name', 'NombreDeTuTabla')  # o hardcode 'ChinaWok-Productos'
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(table_name)
+    table = dynamodb.Table(TABLE_NAME)  # ✅ usar la constante directamente
 
     try:
         # --- Obtener todos los items ---
