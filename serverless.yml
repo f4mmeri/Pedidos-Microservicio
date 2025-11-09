@@ -52,7 +52,7 @@ functions:
           integration: lambda
 
   listar_productos:
-    handler: src.productos.ListarProductos.lambda_handler
+    handler: src.productos.ListarProducto.lambda_handler
     memorySize: 512
     events:
       - http:
