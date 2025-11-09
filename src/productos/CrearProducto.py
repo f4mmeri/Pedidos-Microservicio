@@ -7,6 +7,13 @@ CATEGORIAS_VALIDAS = [
     "Mariscos","Entradas","Guarniciones","Sopas","Combos","Bebidas","Postres"
 ]
 
+def _resp(status, body):
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+        "body": json.dumps(body, ensure_ascii=False)
+    }
+
 def _validar_producto(prod):
     req = ["local_id", "nombre", "precio", "categoria", "stock"]
     for k in req:
@@ -22,8 +29,9 @@ def _validar_producto(prod):
         return "stock inválido (entero >= 0)"
     if prod["categoria"] not in CATEGORIAS_VALIDAS:
         return "categoria inválida"
-    # additionalProperties: false (rechazar claves extra)
-    permitidas = set(["local_id","nombre","precio","descripcion","categoria","stock"])
+
+    # Rechazar claves extra
+    permitidas = {"local_id","nombre","precio","descripcion","categoria","stock"}
     extras = set(prod.keys()) - permitidas
     if extras:
         return f"Propiedades no permitidas: {', '.join(sorted(extras))}"
@@ -33,35 +41,42 @@ def _check_token(headers):
     token = (headers or {}).get('Authorization')
     if not token:
         return False
-    lambda_client = boto3.client('lambda')
-    invoke_resp = lambda_client.invoke(
-        FunctionName="ValidarTokenAcceso",
-        InvocationType='RequestResponse',
-        Payload=json.dumps({"token": token})
-    )
-    resp = json.loads(invoke_resp['Payload'].read())
-    return resp.get('statusCode') != 403
+    try:
+        lambda_client = boto3.client('lambda')
+        invoke_resp = lambda_client.invoke(
+            FunctionName="ValidarTokenAcceso",
+            InvocationType='RequestResponse',
+            Payload=json.dumps({"token": token})
+        )
+        resp = json.loads(invoke_resp['Payload'].read())
+        return resp.get('statusCode') != 403
+    except Exception:
+        return False
 
 def lambda_handler(event, context):
-    # Protección (opcional, igual a tu ejemplo)
+    # Autenticación
     if not _check_token(event.get('headers')):
-        return {"message": "Forbidden", "code": 403}
+        return _resp(403, {"message": "Forbidden"})
 
-    producto = event.get('body')          # Viene como OBJETO (no string)
-    if not isinstance(producto, dict):
-        return {"message": "Body inválido; se esperaba JSON objeto", "code": 400}
+    # Parsear body correctamente
+    try:
+        body_raw = event.get('body')
+        producto = json.loads(body_raw) if isinstance(body_raw, str) else (body_raw or {})
+    except Exception:
+        return _resp(400, {"message": "Body inválido; se esperaba JSON objeto"})
 
     err = _validar_producto(producto)
     if err:
-        return {"message": err, "code": 400}
+        return _resp(400, {"message": err})
 
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(TABLE_NAME)
 
-    # Evitar duplicados PK/SK
+    # Evitar duplicados
     key = {"local_id": producto["local_id"], "nombre": producto["nombre"]}
     if table.get_item(Key=key).get("Item"):
-        return {"message": "Ya existe el producto (local_id + nombre)", "code": 409}
+        return _resp(409, {"message": "Ya existe el producto (local_id + nombre)"})
 
+    # Guardar producto
     table.put_item(Item=producto)
-    return {"message": "Producto creado", "data": producto}
+    return _resp(201, {"message": "Producto creado", "data": producto})

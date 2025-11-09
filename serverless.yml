@@ -12,7 +12,7 @@ provider:
 functions:
   # Producto CRUD Functions
   crear_producto:
-    handler: src.productos.crear_producto.lambda_handler
+    handler: src.productos.CrearProducto.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -22,7 +22,7 @@ functions:
           integration: lambda
 
   obtener_producto:
-    handler: src.productos.obtener_producto.lambda_handler
+    handler: src.productos.BuscarProducto.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -32,7 +32,7 @@ functions:
           integration: lambda
 
   actualizar_producto:
-    handler: src.productos.actualizar_producto.lambda_handler
+    handler: src.productos.ModificarProducto.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -42,7 +42,7 @@ functions:
           integration: lambda
 
   eliminar_producto:
-    handler: src.productos.eliminar_producto.lambda_handler
+    handler: src.productos.EliminarProducto.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -52,7 +52,7 @@ functions:
           integration: lambda
 
   listar_productos:
-    handler: src.productos.listar_productos.lambda_handler
+    handler: src.productos.ListarProductos.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -63,7 +63,7 @@ functions:
 
   # Pedidos CRUD Functions
   crear_pedido:
-    handler: src.pedidos.crear_pedido.lambda_handler
+    handler: src.pedidos.CrearPedido.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -73,7 +73,7 @@ functions:
           integration: lambda
 
   obtener_pedido:
-    handler: src.pedidos.obtener_pedido.lambda_handler
+    handler: src.pedidos.BuscarPedido.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -83,7 +83,7 @@ functions:
           integration: lambda
 
   actualizar_pedido:
-    handler: src.pedidos.actualizar_pedido.lambda_handler
+    handler: src.pedidos.ModificarPedido.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -93,7 +93,7 @@ functions:
           integration: lambda
 
   eliminar_pedido:
-    handler: src.pedidos.eliminar_pedido.lambda_handler
+    handler: src.pedidos.EliminarPedido.lambda_handler
     memorySize: 512
     events:
       - http:
@@ -103,7 +103,7 @@ functions:
           integration: lambda
 
   listar_pedidos:
-    handler: src.pedidos.listar_pedidos.lambda_handler
+    handler: src.pedidos.ListarPedidos.lambda_handler
     memorySize: 512
     events:
       - http:
