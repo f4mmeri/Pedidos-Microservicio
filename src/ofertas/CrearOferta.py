@@ -1,14 +1,15 @@
 import boto3
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
-TABLE_NAME = 'ChinaWok-Ofertas'
+TABLE_NAME = "ChinaWok-Ofertas"
 
 def lambda_handler(event, context):
     # Leer body del request
     try:
-        body = json.loads(event['body'])
+        body_raw = event.get("body")
+        body = json.loads(body_raw or "{}") if isinstance(body_raw, str) else (body_raw or {})
     except Exception:
         return {
             "statusCode": 400,
@@ -26,8 +27,8 @@ def lambda_handler(event, context):
 
     # Validar fechas
     try:
-        inicio = datetime.fromisoformat(body["fecha_inicio"])
-        fin = datetime.fromisoformat(body["fecha_limite"])
+        inicio = datetime.fromisoformat(body["fecha_inicio"].replace("Z", "+00:00"))
+        fin = datetime.fromisoformat(body["fecha_limite"].replace("Z", "+00:00"))
         if inicio >= fin:
             return {
                 "statusCode": 400,
@@ -36,7 +37,7 @@ def lambda_handler(event, context):
     except ValueError:
         return {
             "statusCode": 400,
-            "body": json.dumps({"message": "Formato de fecha inválido"})
+            "body": json.dumps({"message": "Formato de fecha inválido (usa ISO 8601)"})
         }
 
     # Validar descuento
@@ -54,16 +55,28 @@ def lambda_handler(event, context):
         "producto_nombre": body["producto_nombre"],
         "fecha_inicio": body["fecha_inicio"],
         "fecha_limite": body["fecha_limite"],
-        "porcentaje_descuento": descuento
+        "porcentaje_descuento": float(descuento),
+        "activo": True,
+        "creado_en": datetime.now(timezone.utc).isoformat()
     }
 
     # Guardar en DynamoDB
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(TABLE_NAME)
-    table.put_item(Item=oferta)
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(TABLE_NAME)
+        table.put_item(Item=oferta)
+    except Exception as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"message": "Error al guardar en DynamoDB", "error": str(e)})
+        }
 
     return {
         "statusCode": 201,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        },
         "body": json.dumps({
             "message": "Oferta creada exitosamente",
             "data": oferta
