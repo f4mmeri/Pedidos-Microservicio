@@ -55,8 +55,8 @@ def _check_token(headers):
 
 def lambda_handler(event, context):
     # Autenticación
-    if not _check_token(event.get('headers')):
-        return _resp(403, {"message": "Forbidden"})
+    #if not _check_token(event.get('headers')):
+    #    return _resp(403, {"message": "Forbidden"})
 
     # Parsear body correctamente
     try:
